@@ -7,4 +7,4 @@ resources:
   - cache-api.yaml
 images:
   - name: ghcr.io/jose-oran/gitops-pipeline-cache-api
-    newTag: latest
+    newTag: sha-eec728c7e5481e302af6e57eee04d7f4da6c3c08
