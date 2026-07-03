@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache-api
+  namespace: gitops-pipeline-dev
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cache-api
+  template:
+    metadata:
+      labels:
+        app: cache-api
+    spec:
+      containers:
+        - name: cache-api
+          image: ghcr.io/jose-oran/gitops-pipeline-cache-api:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: app-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cache-api
+  namespace: gitops-pipeline-dev
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  selector:
+    app: cache-api
+  ports:
+    - port: 80
+      targetPort: 8080

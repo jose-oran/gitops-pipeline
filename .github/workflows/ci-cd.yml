@@ -1,0 +1,111 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - run: dotnet test tests/ValidateChangelog.UnitTests/ValidateChangelog.UnitTests.csproj --nologo
+      - run: dotnet test tests/ComputeSyncOrder.UnitTests/ComputeSyncOrder.UnitTests.csproj --nologo
+      - run: dotnet test tests/BumpImageTag.UnitTests/BumpImageTag.UnitTests.csproj --nologo
+
+  integration-tests:
+    name: Integration tests (Testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Cache.IntegrationTests (real Redis via Testcontainers)
+        run: dotnet test tests/Cache.IntegrationTests/Cache.IntegrationTests.csproj --nologo
+
+  coverage-gate:
+    name: Coverage gate (enforced threshold)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Enforce 80% line coverage on Cache
+        run: >
+          dotnet test tests/Cache.UnitTests/Cache.UnitTests.csproj --nologo
+          -p:CollectCoverage=true -p:Threshold=80 -p:ThresholdType=line -p:ThresholdStat=total
+      - name: Prove the gate itself works (twin fixtures, real dotnet test x2)
+        run: dotnet test tests/CoverageGate.IntegrationTests/CoverageGate.IntegrationTests.csproj --nologo
+
+  sync-order:
+    name: Verify ArgoCD sync-wave order
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - run: dotnet test tests/ComputeSyncOrder.UnitTests/ComputeSyncOrder.UnitTests.csproj --nologo
+      - name: Print resolved deployment order for cd/dev
+        run: dotnet run --project src/ComputeSyncOrder -- cd/dev
+
+  changelog-gate:
+    name: Validate CHANGELOG (publish gate)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - run: dotnet test tests/ValidateChangelog.UnitTests/ValidateChangelog.UnitTests.csproj --nologo
+      - name: Extract current version from CHANGELOG.md
+        id: version
+        run: |
+          line=$(grep -m1 '^## \[' CHANGELOG.md)
+          version=$(echo "$line" | sed -E 's/^## \[([^]]+)\].*/\1/')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Validate CHANGELOG entry for the current version
+        run: dotnet run --project src/ValidateChangelog -- CHANGELOG.md ${{ steps.version.outputs.version }}
+
+  bump-image-tag:
+    name: Bump image tag and commit to cd/dev (closes the Jenkins-to-CD gap)
+    needs: [unit-tests, integration-tests, coverage-gate, sync-order, changelog-gate]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Bump cache-api image tag to this commit's SHA
+        run: >
+          dotnet run --project src/BumpImageTag --
+          cd/dev/kustomization.yml ghcr.io/jose-oran/gitops-pipeline-cache-api sha-${{ github.sha }}
+      - name: Commit and push the new tag, if it changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet cd/dev/kustomization.yml; then
+            echo "No image tag change"
+            exit 0
+          fi
+          git add cd/dev/kustomization.yml
+          git commit -m "ci: bump cache-api image tag to sha-${{ github.sha }}"
+          git push

@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BumpImageTag/BumpImageTag.csproj" />
+    <Project Path="src/Cache/Cache.csproj" />
+    <Project Path="src/ComputeSyncOrder/ComputeSyncOrder.csproj" />
+    <Project Path="src/ValidateChangelog/ValidateChangelog.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BumpImageTag.UnitTests/BumpImageTag.UnitTests.csproj" />
+    <Project Path="tests/Cache.IntegrationTests/Cache.IntegrationTests.csproj" />
+    <Project Path="tests/Cache.UnitTests/Cache.UnitTests.csproj" />
+    <Project Path="tests/ComputeSyncOrder.UnitTests/ComputeSyncOrder.UnitTests.csproj" />
+    <Project Path="tests/CoverageGate.IntegrationTests/CoverageGate.IntegrationTests.csproj" />
+    <Project Path="tests/ValidateChangelog.UnitTests/ValidateChangelog.UnitTests.csproj" />
+  </Folder>
+</Solution>

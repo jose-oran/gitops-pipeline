@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: gitops-pipeline-dev
+resources:
+  - namespace-config.yaml
+  - redis.yaml
+  - cache-api.yaml
+images:
+  - name: ghcr.io/jose-oran/gitops-pipeline-cache-api
+    newTag: latest
