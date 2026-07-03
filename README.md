@@ -84,7 +84,7 @@ no confía en ningún reporte de texto, confía en que el proceso realmente fall
 En el sistema real, nada conecta el `docker push` de Jenkins con el `newTag` del repo de
 CD — se edita a mano. `BumpImageTag` hace ese paso mediante reemplazo de texto quirúrgico
 (no un parseo+reserializado completo de YAML, para no reformatear el resto del archivo) y
-el workflow de GitHub Actions lo ejecuta al final de un run exitoso en `main`, commiteando
+el workflow de GitHub Actions lo ejecuta al final de un run exitoso en `master`, commiteando
 el nuevo tag directamente a `cd/dev/kustomization.yml`.
 
 ## El pipeline real: [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml)
@@ -99,7 +99,7 @@ Seis jobs, corriendo en el propio repo público:
    `cd/dev/` para que quede visible en el log del run.
 5. **`changelog-gate`** — extrae la versión vigente del propio `CHANGELOG.md` y valida esa
    entrada con `ValidateChangelog`.
-6. **`bump-image-tag`** — solo en push a `main` y solo si los cinco jobs anteriores
+6. **`bump-image-tag`** — solo en push a `master` y solo si los cinco jobs anteriores
    pasaron: bump del tag de imagen al SHA del commit, commit y push a `cd/dev/` con las
    credenciales del propio workflow.
 
